@@ -84,9 +84,11 @@ def detect_seat_centers_watershed(mask_img_path: str) -> pd.DataFrame:
         cx = int(M["m10"] / M["m00"])
         cy = int(M["m01"] / M["m00"])
         if cx < 1400:
-            rows.append((cx, cy, w, h, float(area)))
+            # rows.append((cx, cy, w, h, float(area)))
+            rows.append((cx, cy))
 
-    return pd.DataFrame(rows, columns=["cx", "cy", "w", "h", "area_px"])
+    # return pd.DataFrame(rows, columns=["cx", "cy", "w", "h", "area_px"])
+    return pd.DataFrame(rows, columns=["cx", "cy"])
 
 def annotate_and_save(img_path: str, centers_df: pd.DataFrame, out_path: str):
     img = cv2.imread(img_path)
@@ -98,9 +100,9 @@ def annotate_and_save(img_path: str, centers_df: pd.DataFrame, out_path: str):
 
 
 if __name__ == "__main__":
-    # theatre_names = ["BCC_1", "CGV_IMAX", "Lotte_5"]
+    theatre_names = ["BCC_1", "CGV_IMAX", "Lotte_5"]
     # theatre_names = ["BCC_1", "Lotte_5"]
-    theatre_names = ["CGV_IMAX"]    
+    theatre_names = ["CGV_IMAX"]
 
     for theatre_name in theatre_names:
         image = os.path.join("Theatres", theatre_name+".png")
