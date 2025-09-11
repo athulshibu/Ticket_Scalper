@@ -56,7 +56,7 @@ def detect_seat_centers_watershed(mask_img_path: str) -> pd.DataFrame:
     dist = cv2.distanceTransform(bw, cv2.DIST_L2, 3)
     dist_norm = cv2.normalize(dist, None, 0, 1.0, cv2.NORM_MINMAX)
     # Peaks for markers (0.40–0.50 of max works well for these seats)
-    _, peaks = cv2.threshold((dist_norm * 255).astype(np.uint8), 110, 255, cv2.THRESH_BINARY)
+    _, peaks = cv2.threshold((dist_norm * 255).astype(np.uint8), 137, 255, cv2.THRESH_BINARY)
     peaks = cv2.morphologyEx(peaks, cv2.MORPH_OPEN, k, iterations=1)
 
     num_markers, markers = cv2.connectedComponents(peaks)
@@ -112,4 +112,4 @@ if __name__ == "__main__":
         # df = find_white_square_centers(mask_name)
         df = detect_seat_centers_watershed(mask_name)
         df.to_csv(f"{theatre_name}_square_centers.csv", index=False)
-        annotate_and_save(mask_name, df, f"{theatre_name}_annotated.png")
+        annotate_and_save(mask_name, df, f"{theatre_name}_annotated.png")   
