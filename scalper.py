@@ -12,7 +12,7 @@ movies = [
     ["179", "Frankenstein", "CGV_IMAX", True],
     # ["212", "If on a Winter′s Night", "Lotte_5", False],
     # ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
-    # ["528", "Adam's Sake", "Lotte_5", False],
+    ["528", "Adam's Sake", "Lotte_5", False],
     # ["560", "Eagles of the Republic", "BCC_1", False], 
     # ["494", "Romeria", "CGV_IMAX", False], 
 ]
@@ -33,11 +33,23 @@ blue_seat = (132, 153, 222)
 gray_seat = (173, 173, 173)
 red_button = (166, 33, 28)
 
+def beep_beep():
+    for _ in range(1000):
+        winsound.Beep(1000,500)
+        time.sleep(0.5)
+
+
 def check_seats(theatre):
+    time.sleep(0.7)
     pyautogui.PAUSE=0.01
     for i, (x,y) in enumerate(coordinates[theatre]):
         pyautogui.click(x,y)
+        if i % 10:
+            if pyautogui.pixel(1295,165) == (255,255,255): # If a dialogue box is open, no need to keep checking
+                print("Stopping seat checking")
+                break
     pyautogui.PAUSE=0.1
+    time.sleep(0.3)
     pyautogui.press("enter")
     pyautogui.click(1887, 1036) # Clicking the red button
 
@@ -59,16 +71,12 @@ def check_seats(theatre):
             pyautogui.moveTo(33, 283)
             pyautogui.scroll(-1000)
             pyautogui.click(33, 283) # Checking T&C
-            # pyautogui.moveTo(1875, 1361) # Move to Payment Button
-            pyautogui.click(1875, 1361) # Click Payment Button
-            for i in range(1000):
-                winsound.Beep(1000,500)
-                time.sleep(0.5)
+            pyautogui.moveTo(1875, 1361) # Move to Payment Button
+            # pyautogui.click(1875, 1361) # Click Payment Button
+            beep_beep()
         exit()
     else:
-        for i in range(1000):
-            winsound.Beep(1000,500)
-            time.sleep(0.5)
+        beep_beep()
         exit()
 
 
@@ -130,12 +138,16 @@ def main():
             check_seats(movies[counter][2])
             return
 
-
         counter = (counter + 1) % len(movies)
 
 
     # Logout
-    pyautogui.click(2329,237) # Log out
+    time.sleep(0.1)
+    pyautogui.click(17,235)
+    pyautogui.press("tab") 
+    pyautogui.press("tab") 
+    pyautogui.press("tab") 
+    pyautogui.press("enter")  # Log out
     time.sleep(0.1)
 
     # Close the window
@@ -144,7 +156,10 @@ def main():
     pyautogui.keyUp("alt")
 
 if __name__ == "__main__":
-    print("Make sure Chrome is closed!!!")
-    time.sleep(3)
+    time.sleep(1)
+    pyautogui.keyUp("win")
+    pyautogui.keyUp("alt")
+    pyautogui.keyUp("ctrl")
+    
     while(True):
         main()
