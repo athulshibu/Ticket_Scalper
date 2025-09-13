@@ -225,8 +225,23 @@ def pick_first_blue_seat_then_confirm(driver, timeout=30):
 
     return True
 
+def final_page(driver):
+    checkbox = driver.find_element(By.ID, "chkCanAgreeAll")
+    print("Going to check the T&C")
+    if not checkbox.is_selected():
+        check_checkbox(driver, checkbox_id="chkCanAgreeAll")
+    time.sleep(1)
+    # Text on Button for Payment = 결제하기
+    print("Waiting for final Button")
+    # driver.find_element(By.ID, "btnFinalPayment").click()
+    pyautogui.keyDown("win")
+    pyautogui.press("up") # For some reason, the button is not recognised unless it's in full screen, which I guess has something to do with it not being in view when not in full screen
+    pyautogui.keyUp("win")
+    click_final_payment(driver)
+    print("Final Button Found")
+
 # For some reason, it is way slower, so go back to pyautogui
-def final_page():
+def final_page_fast():
     pyautogui.keyDown("win")
     pyautogui.press("up")
     pyautogui.keyUp("win")
@@ -281,7 +296,7 @@ user_id = data.get("username")
 password = data.get("password")
 
 
-def main():
+def main(seconds_per_session=550):
     counter = 0
     opts = Options()
     opts.add_experimental_option("detach", True)   # keep Chrome open after script ends
@@ -301,7 +316,7 @@ def main():
     start_time = time.time()
     code_box = driver.find_element(By.ID, "sdCode")
     in_booking = False
-    while time.time() - start_time < 550 and not in_booking: # Time in seconds
+    while time.time() - start_time < seconds_per_session and not in_booking: # Time in seconds
         movie = movies[counter % number_of_movies]
 
         print("Current handle:", driver.current_window_handle)
@@ -350,21 +365,8 @@ def main():
                 # Text on button = 가격선택
                 driver.find_element(By.ID, "nextPayment").click()
 
-                # checkbox = driver.find_element(By.ID, "chkCanAgreeAll")
-                # print("Going to check the T&C")
-                # if not checkbox.is_selected():
-                #     check_checkbox(driver, checkbox_id="chkCanAgreeAll")
-                # time.sleep(1)
-                # # Text on Button for Payment = 결제하기
-                # print("Waiting for final Button")
-                # # driver.find_element(By.ID, "btnFinalPayment").click()
-                # pyautogui.keyDown("win")
-                # pyautogui.press("up") # For some reason, the button is not recognised unless it's in full screen, which I guess has something to do with it not being in view when not in full screen
-                # pyautogui.keyUp("win")
-                # click_final_payment(driver)
-                # print("Final Button Found")
-
-                final_page()
+                final_page(driver)
+                # final_page_fast()
 
                 beep_beep()
 
@@ -381,13 +383,13 @@ def main():
         driver.switch_to.window(main_window)
         code_box.clear()
 
-    time.sleep(5)
+    driver.find_element(By.CSS_SELECTOR, 'a[href="/biff-logout"]').click()
     driver.quit()
+    time.sleep(1)
 
     
 
 if __name__ == "__main__":
-    time.sleep(1)    
-    # while(True):
-    main()
+    while(True):
+        main(550)
     # exit()
