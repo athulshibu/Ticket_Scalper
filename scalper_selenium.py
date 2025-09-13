@@ -225,6 +225,19 @@ def pick_first_blue_seat_then_confirm(driver, timeout=30):
 
     return True
 
+# For some reason, it is way slower, so go back to pyautogui
+def final_page():
+    pyautogui.keyDown("win")
+    pyautogui.press("up")
+    pyautogui.keyUp("win")
+
+    pyautogui.moveTo(197,385)
+    pyautogui.scroll(-1000)
+    pyautogui.click(197,385)
+    pyautogui.click(2234,1452)
+
+    return
+
 def beep_beep(count=1000):
     for _ in range(count):
         winsound.Beep(1000,500)
@@ -244,7 +257,7 @@ movies = [
     # ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
     # ["528", "Adam's Sake", "Lotte_5", False],
     # ["560", "Eagles of the Republic", "BCC_1", False], 
-    # ["494", "Romeria", "CGV_IMAX", False],
+    ["494", "Romeria", "CGV_IMAX", False],
     # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
 ]
 
@@ -326,6 +339,9 @@ def main():
                 )
                 ticketing_btn.click()
 
+                # If someoone has already clicked the seat, dialogue box appears saying
+                # 이미 선택된 좌석입니다. [T8280]
+
                 # dropdown_box = WebDriverWait(driver, 0.5).until(
                 #     EC.presence_of_element_located((By.ID, "volume_1_1"))
                 # )
@@ -334,19 +350,21 @@ def main():
                 # Text on button = 가격선택
                 driver.find_element(By.ID, "nextPayment").click()
 
-                checkbox = driver.find_element(By.ID, "chkCanAgreeAll")
-                print("Going to check the T&C")
-                if not checkbox.is_selected():
-                    check_checkbox(driver, checkbox_id="chkCanAgreeAll")
-                time.sleep(1)
-                # Text on Button for Payment = 결제하기
-                print("Waiting for final Button")
-                # driver.find_element(By.ID, "btnFinalPayment").click()
-                pyautogui.keyDown("win")
-                pyautogui.press("up") # For some reason, the button is not recognised unless it's in full screen, which I guess has something to do with it not being in view when not in full screen
-                pyautogui.keyUp("win")
-                click_final_payment(driver)
-                print("Final Button Found")
+                # checkbox = driver.find_element(By.ID, "chkCanAgreeAll")
+                # print("Going to check the T&C")
+                # if not checkbox.is_selected():
+                #     check_checkbox(driver, checkbox_id="chkCanAgreeAll")
+                # time.sleep(1)
+                # # Text on Button for Payment = 결제하기
+                # print("Waiting for final Button")
+                # # driver.find_element(By.ID, "btnFinalPayment").click()
+                # pyautogui.keyDown("win")
+                # pyautogui.press("up") # For some reason, the button is not recognised unless it's in full screen, which I guess has something to do with it not being in view when not in full screen
+                # pyautogui.keyUp("win")
+                # click_final_payment(driver)
+                # print("Final Button Found")
+
+                final_page()
 
                 beep_beep()
 
