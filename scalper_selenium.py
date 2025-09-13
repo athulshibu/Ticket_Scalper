@@ -244,7 +244,7 @@ movies = [
     # ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
     # ["528", "Adam's Sake", "Lotte_5", False],
     # ["560", "Eagles of the Republic", "BCC_1", False], 
-    ["494", "Romeria", "CGV_IMAX", False],
+    # ["494", "Romeria", "CGV_IMAX", False],
     # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
 ]
 
