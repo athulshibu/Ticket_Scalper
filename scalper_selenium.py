@@ -5,6 +5,7 @@ import pyautogui
 import pandas as pd
 import winsound
 import json
+import psutil
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -365,8 +366,8 @@ def main(seconds_per_session=550):
                 # Text on button = 가격선택
                 driver.find_element(By.ID, "nextPayment").click()
 
-                final_page(driver)
-                # final_page_fast()
+                # final_page(driver)
+                final_page_fast()
 
                 beep_beep()
 
@@ -392,4 +393,11 @@ def main(seconds_per_session=550):
 if __name__ == "__main__":
     while(True):
         main(550)
+        battery = psutil.sensors_battery()
+        if battery is not None:
+            percent = battery.percent
+            if percent < 10:
+                beep_beep()
+            elif percent < 20:
+                beep_beep(20)
     # exit()
