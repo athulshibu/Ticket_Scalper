@@ -315,8 +315,18 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # Colour of not available seat is RGB(175,175,175)
             if not pick_first_blue_seat_then_confirm(driver):
                 beep_beep(message="Red button, but no seat")
+                # while not pick_first_blue_seat_then_confirm(driver):
+                #     start_time = time.time()
+                #     driver.execute_script("refreshMap();")
+                #     print(time.time()-start_time)
                 while not pick_first_blue_seat_then_confirm(driver):
-                    driver.execute_script("refreshMap();")
+                    start_time = time.time()
+                    driver.switch_to.window(main_window)
+                    driver.execute_script("sdCodeProdList();")
+                    driver.switch_to.window(seat_window)
+                    print(time.time()-start_time)
+                print("Seat found after Refreshing")
+            
             # Text on Ticketing button before seat is selected = 좌석선택
             # Text on Tickeitng button after seat is selected = 다음단계
             # Text when seat is unselected = 좌석선택
@@ -388,7 +398,7 @@ if __name__ == "__main__":
         # ["494", "Romeria", "CGV_IMAX", False],
         # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
 
-        ["300", "Love on Trial", "BCC_1", False]
+        ["264", "Love on Trial", "BCC_1", False]
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
