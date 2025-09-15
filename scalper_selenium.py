@@ -302,7 +302,7 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
         try:
             print("All handles:", driver.window_handles)
             print("Current handle:", driver.current_window_handle)
-            book_btn = WebDriverWait(driver, 0.05).until(
+            book_btn = WebDriverWait(driver, 0.01).until(
                 EC.presence_of_element_located((By.XPATH, '//button[text()="예매"]'))
             )
             book_btn.click()
@@ -314,17 +314,18 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # Colour of available seat is RGB(129,171,255)
             # Colour of not available seat is RGB(175,175,175)
             if not pick_first_blue_seat_then_confirm(driver):
-                beep_beep(message="Red button, but no seat")
-                # while not pick_first_blue_seat_then_confirm(driver):
-                #     start_time = time.time()
-                #     driver.execute_script("refreshMap();")
-                #     print(time.time()-start_time)
+                beep_beep(message=f"Red button, but no seat for {movie[0]} - {movie[1]}")
+                # this_start_time = 0
                 while not pick_first_blue_seat_then_confirm(driver):
-                    start_time = time.time()
-                    driver.switch_to.window(main_window)
-                    driver.execute_script("sdCodeProdList();")
-                    driver.switch_to.window(seat_window)
-                    print(time.time()-start_time)
+                    # print(time.time()-this_start_time)
+                    driver.execute_script("refreshMap();")
+                    # this_start_time = time.time()
+                # while not pick_first_blue_seat_then_confirm(driver):
+                #     print(time.time()-this_start_time)
+                #     driver.switch_to.window(main_window)
+                #     book_btn.click()
+                #     driver.switch_to.window(seat_window)
+                #     this_start_time = time.time()
                 print("Seat found after Refreshing")
             
             # Text on Ticketing button before seat is selected = 좌석선택
@@ -389,6 +390,7 @@ if __name__ == "__main__":
         # ["020", "No Other Choice", "CGV_IMAX", False],
 
         # ["179", "Frankenstein", "CGV_IMAX", True],
+        # ["119", "Her Will be Done", "CGV_6", True]
         # ["023", "Frankenstein", "CGV_IMAX", True],
         # ["212", "If on a Winter′s Night", "Lotte_5", False],
 
@@ -398,7 +400,6 @@ if __name__ == "__main__":
         # ["494", "Romeria", "CGV_IMAX", False],
         # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
 
-        ["264", "Love on Trial", "BCC_1", False]
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
