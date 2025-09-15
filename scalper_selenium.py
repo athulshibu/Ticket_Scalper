@@ -5,6 +5,9 @@ import pyautogui
 import pandas as pd
 import winsound
 import json
+import psutil
+import argparse
+import requests
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -253,55 +256,24 @@ def final_page_fast():
 
     return
 
-def beep_beep(count=1000):
-    for _ in range(count):
-        winsound.Beep(1000,500)
-        time.sleep(0.1)
-
-movies = [
-    # [Movie code, Movie name, Theatre code, 19+ or not]
-    ["020", "No Other Choice", "CGV_IMAX", False],
-    ["083", "No Other Choice", "BCC_1", False],
-    # ["083", "No Other Choice", "BCC_1", False],
-    # ["020", "No Other Choice", "CGV_IMAX", False],
-
-    # ["179", "Frankenstein", "CGV_IMAX", True],
-    # ["023", "Frankenstein", "CGV_IMAX", True],
-    # ["212", "If on a Winter′s Night", "Lotte_5", False],
-
-    # ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
-    # ["528", "Adam's Sake", "Lotte_5", False],
-    # ["560", "Eagles of the Republic", "BCC_1", False], 
-    ["494", "Romeria", "CGV_IMAX", False],
-    # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
-]
-
-theatres = []
-for movie in movies:
-    if movie[2] not in theatres:
-        theatres.append(movie[2])
-
-coordinates = {}
-for theatre in theatres:
-    csv_file = os.path.join("CSV_Seats", theatre+"_square_centers.csv")
-    df = pd.read_csv(csv_file)
-    coordinates[theatre] = list(df.itertuples(index=False, name=None))
-
-link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
-number_of_movies = len(movies)
-
-with open("credentials.json", encoding="utf-8") as f:
-    data = json.load(f)
-user_id = data.get("username")
-password = data.get("password")
+def beep_beep(count=None):
+    with open("credentials.json", encoding="utf-8") as f:
+        data = json.load(f)
+    my_id = data.get("my_id")
+    token = data.get("notification_bot_http_api")
+    if (count is not None) or (token is None or token == ""):
+        for _ in range(count):
+            winsound.Beep(1000,500)
+            time.sleep(0.1)
+    else:
+        url = f"https://api.telegram.org/bot{token}"
+        params = {"chat_id": my_id, "text": "Something happened!"}
+        r = requests.get(f"{url}/sendMessage", params=params)
 
 
-def main(seconds_per_session=550):
+def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
     counter = 0
-    opts = Options()
-    opts.add_experimental_option("detach", True)   # keep Chrome open after script ends
-    driver = webdriver.Chrome(options=opts)
-    # driver = webdriver.Chrome()
+    number_of_movies = len(movies)
     driver.get(link_to_ticketing)
     tel_box = driver.find_element(By.ID, "telNo") # ID of Username Textbox
     tel_box.send_keys(user_id)
@@ -365,8 +337,8 @@ def main(seconds_per_session=550):
                 # Text on button = 가격선택
                 driver.find_element(By.ID, "nextPayment").click()
 
-                final_page(driver)
-                # final_page_fast()
+                # final_page(driver)
+                final_page_fast()
 
                 beep_beep()
 
@@ -384,12 +356,62 @@ def main(seconds_per_session=550):
         code_box.clear()
 
     driver.find_element(By.CSS_SELECTOR, 'a[href="/biff-logout"]').click()
-    driver.quit()
+    # driver.quit()
     time.sleep(1)
 
-    
+def parse_args(argv=None):
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-m", "--movie_id", type=int, default=-1, help="number of images to process")
+
+    args, _ = parser.parse_known_args(argv)
+    return args
+
 
 if __name__ == "__main__":
+
+    movies = [
+        # [Movie code, Movie name, Theatre code, 19+ or not]
+        ["020", "No Other Choice", "CGV_IMAX", False],
+        ["083", "No Other Choice", "BCC_1", False],
+        # ["083", "No Other Choice", "BCC_1", False],
+        # ["020", "No Other Choice", "CGV_IMAX", False],
+
+        # ["179", "Frankenstein", "CGV_IMAX", True],
+        # ["023", "Frankenstein", "CGV_IMAX", True],
+        # ["212", "If on a Winter′s Night", "Lotte_5", False],
+
+        # ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
+        # ["528", "Adam's Sake", "Lotte_5", False],
+        # ["560", "Eagles of the Republic", "BCC_1", False], 
+        # ["494", "Romeria", "CGV_IMAX", False],
+        # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
+    ]
+
+    link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
+    number_of_movies = len(movies)
+
+    with open("credentials.json", encoding="utf-8") as f:
+        data = json.load(f)
+    user_id = data.get("username")
+    password = data.get("password")
+
+    args = parse_args()
+    if args.movie_id != -1:
+        movies = [movies[args.movie_id]]
+
+    opts = Options()
+    opts.add_experimental_option("detach", True)   # keep Chrome open after script ends
+    driver = webdriver.Chrome(options=opts)
+    # driver = webdriver.Chrome()
     while(True):
-        main(550)
+        main(link_to_ticketing, user_id, password, movies, 550)
+        battery = psutil.sensors_battery()
+        if battery is not None:
+            percent = battery.percent
+            if percent < 10:
+                beep_beep(100)
+            elif percent < 20:
+                beep_beep(20)
     # exit()
