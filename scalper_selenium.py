@@ -255,7 +255,7 @@ def final_page_fast():
 
     return
 
-def beep_beep(count=None):
+def beep_beep(count=None, message="Something happened!"):
     with open("credentials.json", encoding="utf-8") as f:
         data = json.load(f)
     my_id = data.get("my_id")
@@ -266,7 +266,7 @@ def beep_beep(count=None):
             time.sleep(0.1)
     else:
         url = f"https://api.telegram.org/bot{token}"
-        params = {"chat_id": my_id, "text": "Something happened!"}
+        params = {"chat_id": my_id, "text": message}
         r = requests.get(f"{url}/sendMessage", params=params)
 
 
@@ -314,32 +314,33 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # Colour of available seat is RGB(129,171,255)
             # Colour of not available seat is RGB(175,175,175)
             if not pick_first_blue_seat_then_confirm(driver):
-                driver.execute_script("refreshMap();")
-            else:
-                # Text on Ticketing button before seat is selected = 좌석선택
-                # Text on Tickeitng button after seat is selected = 다음단계
-                # Text when seat is unselected = 좌석선택
-                print("Waiting for button")
-                ticketing_btn = WebDriverWait(driver, 0.5).until(
-                    EC.presence_of_element_located((By.ID, "nextTicketSelection"))
-                )
-                ticketing_btn.click()
+                beep_beep(message="Red button, but no seat")
+                while not pick_first_blue_seat_then_confirm(driver):
+                    driver.execute_script("refreshMap();")
+            # Text on Ticketing button before seat is selected = 좌석선택
+            # Text on Tickeitng button after seat is selected = 다음단계
+            # Text when seat is unselected = 좌석선택
+            print("Waiting for button")
+            ticketing_btn = WebDriverWait(driver, 0.5).until(
+                EC.presence_of_element_located((By.ID, "nextTicketSelection"))
+            )
+            ticketing_btn.click()
 
-                # If someoone has already clicked the seat, dialogue box appears saying
-                # 이미 선택된 좌석입니다. [T8280]
+            # If someoone has already clicked the seat, dialogue box appears saying
+            # 이미 선택된 좌석입니다. [T8280]
 
-                # dropdown_box = WebDriverWait(driver, 0.5).until(
-                #     EC.presence_of_element_located((By.ID, "volume_1_1"))
-                # )
-                dropdown = driver.find_element(By.ID, "volume_1_1")
-                Select(dropdown).select_by_value("1")
-                # Text on button = 가격선택
-                driver.find_element(By.ID, "nextPayment").click()
+            # dropdown_box = WebDriverWait(driver, 0.5).until(
+            #     EC.presence_of_element_located((By.ID, "volume_1_1"))
+            # )
+            dropdown = driver.find_element(By.ID, "volume_1_1")
+            Select(dropdown).select_by_value("1")
+            # Text on button = 가격선택
+            driver.find_element(By.ID, "nextPayment").click()
 
-                # final_page(driver)
-                final_page_fast()
+            # final_page(driver)
+            final_page_fast()
 
-                beep_beep()
+            beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!")
 
             break
             return
@@ -386,6 +387,8 @@ if __name__ == "__main__":
         # ["560", "Eagles of the Republic", "BCC_1", False], 
         # ["494", "Romeria", "CGV_IMAX", False],
         # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
+
+        ["300", "Love on Trial", "BCC_1", False]
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
