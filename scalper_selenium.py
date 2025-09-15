@@ -336,8 +336,8 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
                 # Text on button = 가격선택
                 driver.find_element(By.ID, "nextPayment").click()
 
-                final_page(driver)
-                # final_page_fast()
+                # final_page(driver)
+                final_page_fast()
 
                 beep_beep()
 
