@@ -2,7 +2,6 @@ import os
 import time
 
 import pyautogui
-import pandas as pd
 import winsound
 import json
 import psutil
