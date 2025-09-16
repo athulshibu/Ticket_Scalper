@@ -1,2 +1,2 @@
 # Ignore credentials file(s)
-credentials.json
+*.json

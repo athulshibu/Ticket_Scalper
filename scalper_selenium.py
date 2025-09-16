@@ -152,7 +152,20 @@ def click_final_payment(driver, timeout=0.5):
     # Optional: verify navigation/state change (e.g., title/url or a new panel)
     # wait.until(EC.url_changes(current_url))  # or wait for a unique element on next step
 
-
+def accept_alert_if_present(driver, timeout=0.1):
+    """
+    Checks if an alert/confirm/prompt is present within timeout seconds.
+    If found, accepts it and returns True. If none, returns False.
+    """
+    try:
+        WebDriverWait(driver, timeout).until(EC.alert_is_present())
+        alert = driver.switch_to.alert
+        print("⚠ Alert text:", alert.text)
+        alert.accept()
+        print("✅ Accepted alert")
+        return True
+    except TimeoutException:
+        return False
 
 def pick_first_blue_seat_then_confirm(driver, timeout=30):
     """
@@ -235,10 +248,7 @@ def final_page(driver):
     time.sleep(1)
     # Text on Button for Payment = 결제하기
     print("Waiting for final Button")
-    # driver.find_element(By.ID, "btnFinalPayment").click()
-    pyautogui.keyDown("win")
-    pyautogui.press("up") # For some reason, the button is not recognised unless it's in full screen, which I guess has something to do with it not being in view when not in full screen
-    pyautogui.keyUp("win")
+    driver.maximize_window() # For some reason, the button is not recognised unless it's in full screen, which I guess has something to do with it not being in view when not in full screen
     click_final_payment(driver)
     print("Final Button Found")
 
@@ -302,10 +312,14 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
         try:
             print("All handles:", driver.window_handles)
             print("Current handle:", driver.current_window_handle)
-            book_btn = WebDriverWait(driver, 0.01).until(
+            book_btn = WebDriverWait(driver, 0.02).until(
                 EC.presence_of_element_located((By.XPATH, '//button[text()="예매"]'))
             )
             book_btn.click()
+
+            # Possibility of a Popup
+            accept_alert_if_present(driver, timeout=0.05)
+
             seat_window = switch_to_new_window(driver, main_window, timeout=10)
             # time.sleep(5)
             print("Currently in New Window: ", driver.current_window_handle)
@@ -348,8 +362,8 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # Text on button = 가격선택
             driver.find_element(By.ID, "nextPayment").click()
 
-            # final_page(driver)
-            final_page_fast()
+            final_page(driver)
+            # final_page_fast()
 
             beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!")
 
@@ -374,7 +388,9 @@ def parse_args(argv=None):
     """Parse command line arguments."""
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-m", "--movie_id", type=int, default=-1, help="number of images to process")
+    parser.add_argument("-m", "--movie_id", type=int, default=-1, help="ID of the movie in the list")
+    parser.add_argument("-c", "--credentials", type=str, default="credentials.json", help="Credentials file")
+
 
     args, _ = parser.parse_known_args(argv)
     return args
@@ -388,13 +404,15 @@ if __name__ == "__main__":
         ["083", "No Other Choice", "BCC_1", False],
         # ["083", "No Other Choice", "BCC_1", False],
         # ["020", "No Other Choice", "CGV_IMAX", False],
+        ["259", "Kokuho", "CGV_IMAX", False],
+        ["219", "The Furious", "Lotte_6", True],
 
         # ["179", "Frankenstein", "CGV_IMAX", True],
         # ["119", "Her Will be Done", "CGV_6", True]
         # ["023", "Frankenstein", "CGV_IMAX", True],
         # ["212", "If on a Winter′s Night", "Lotte_5", False],
 
-        # ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
+        ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
         # ["528", "Adam's Sake", "Lotte_5", False],
         # ["560", "Eagles of the Republic", "BCC_1", False], 
         # ["494", "Romeria", "CGV_IMAX", False],
@@ -404,13 +422,13 @@ if __name__ == "__main__":
 
     link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
     number_of_movies = len(movies)
+    args = parse_args()
 
-    with open("credentials.json", encoding="utf-8") as f:
+    with open(args.credentials, encoding="utf-8") as f:
         data = json.load(f)
     user_id = data.get("username")
     password = data.get("password")
 
-    args = parse_args()
     if args.movie_id != -1:
         movies = [movies[args.movie_id]]
 
