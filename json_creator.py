@@ -4,6 +4,14 @@ from pathlib import Path
 import os
 
 def main():
+    try:
+        with open("credentials.json", encoding="utf-8") as f:
+            data = json.load(f)
+        my_id = data.get("my_id")
+        token = data.get("notification_bot_http_api")
+    except:
+        my_id = None
+        token = None
     username = input("Username: ").strip()
     password = getpass.getpass("Password: ")
     my_id = input("My Telgram ID (optional): ").strip()
