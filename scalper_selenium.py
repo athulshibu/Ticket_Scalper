@@ -1,7 +1,5 @@
-import io
 import os
 import time
-from collections import deque
 
 import pyautogui
 import winsound
@@ -9,7 +7,6 @@ import json
 import psutil
 import argparse
 import requests
-from PIL import Image, ImageChops
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -196,106 +193,49 @@ def accept_alert_if_present(driver, timeout=0.1):
 def pick_first_blue_seat_then_confirm(driver, timeout=30):
     """
     Assumes you've already switched to the seat popup window.
-    Finds the first available blue seat rendered in the canvas seat map and
-    clicks it. Returns True when a blue seat is found, else False.
+    Finds the first available blue Konva seat and clicks its rendered center.
+    Returns True when a blue seat is found, else False.
     """
-    def largest_canvas_container():
-        canvases = []
-        for canvas in driver.find_elements(By.TAG_NAME, "canvas"):
-            size = canvas.size
-            if canvas.is_displayed() and size["width"] >= 200 and size["height"] >= 200:
-                canvases.append(canvas)
-        if not canvases:
-            return False
-        largest_canvas = max(
-            canvases,
-            key=lambda canvas: canvas.size["width"] * canvas.size["height"],
-        )
-        return largest_canvas.find_element(By.XPATH, "..")
-
-    def find_canvas_container(_):
+    def find_first_available_seat(_):
         driver.switch_to.default_content()
-        seat_map = largest_canvas_container()
-        if seat_map:
-            return seat_map
-
-        frames = driver.find_elements(By.TAG_NAME, "iframe")
-        for frame in frames:
+        for frame in driver.find_elements(By.TAG_NAME, "iframe"):
             driver.switch_to.default_content()
             driver.switch_to.frame(frame)
-            seat_map = largest_canvas_container()
-            if seat_map:
-                return seat_map
+            seat_map = driver.find_elements(By.ID, "seatMap")
+            if not seat_map:
+                continue
+
+            seat = driver.execute_script("""
+                const availableSeat = Konva.stages
+                    .flatMap(stage => stage.find('Rect'))
+                    .find(rect => rect.fill() === '#81abff');
+                if (!availableSeat) return null;
+
+                const bounds = availableSeat.getClientRect();
+                return {
+                    id: availableSeat.id(),
+                    x: bounds.x + bounds.width / 2,
+                    y: bounds.y + bounds.height / 2,
+                };
+            """)
+            if seat:
+                return seat_map[0], seat
 
         driver.switch_to.default_content()
         return False
 
     try:
-        seat_map = WebDriverWait(driver, timeout).until(find_canvas_container)
+        seat_map, seat = WebDriverWait(driver, timeout).until(find_first_available_seat)
     except TimeoutException:
-        print("No visible seat-map canvas found yet")
+        print("No available Konva seat found yet")
         return False
-    print(
-        "Using canvas container:",
-        seat_map.get_attribute("id") or seat_map.get_attribute("class") or "unnamed",
-    )
-    screenshot = Image.open(io.BytesIO(seat_map.screenshot_as_png)).convert("RGB")
-    width, height = screenshot.size
-    red, green, blue = screenshot.split()
-    mask = ImageChops.multiply(
-        ImageChops.multiply(
-            red.point([255 if 121 <= value <= 137 else 0 for value in range(256)]),
-            green.point([255 if 163 <= value <= 179 else 0 for value in range(256)]),
-        ),
-        blue.point([255 if 247 <= value <= 255 else 0 for value in range(256)]),
-    )
-    bounds = mask.getbbox()
-    if bounds:
-        _, top, _, _ = bounds
-        row_bounds = mask.crop((0, top, width, top + 1)).getbbox()
-        if not row_bounds:
-            print("No available blue seats found in #seatMap")
-            return False
-        left, _, _, _ = row_bounds
-        search_width = min(50, width - left)
-        search_height = min(50, height - top)
-        seat_mask = mask.crop((left, top, left + search_width, top + search_height))
-        seat_pixels = seat_mask.load()
-        region = []
-        queue = deque([(0, 0)])
-        visited = {(0, 0)}
-
-        while queue:
-            current_x, current_y = queue.popleft()
-            region.append((current_x, current_y))
-            for next_x, next_y in (
-                (current_x - 1, current_y),
-                (current_x + 1, current_y),
-                (current_x, current_y - 1),
-                (current_x, current_y + 1),
-            ):
-                if (
-                    0 <= next_x < search_width
-                    and 0 <= next_y < search_height
-                    and (next_x, next_y) not in visited
-                    and seat_pixels[next_x, next_y]
-                ):
-                    visited.add((next_x, next_y))
-                    queue.append((next_x, next_y))
-
-        if len(region) >= 25:
-            pixel_x = left + sum(point[0] for point in region) / len(region)
-            pixel_y = top + sum(point[1] for point in region) / len(region)
-            map_width = seat_map.size["width"]
-            map_height = seat_map.size["height"]
-            offset_x = pixel_x * map_width / width - map_width / 2
-            offset_y = pixel_y * map_height / height - map_height / 2
-            ActionChains(driver).move_to_element(seat_map).move_by_offset(offset_x, offset_y).click().perform()
-            print(f"Clicked first blue seat at ({pixel_x:.0f}, {pixel_y:.0f})")
-            return True
-
-    print("No available blue seats found in #seatMap")
-    return False
+    map_width = seat_map.size["width"]
+    map_height = seat_map.size["height"]
+    offset_x = seat["x"] - map_width / 2
+    offset_y = seat["y"] - map_height / 2
+    ActionChains(driver).move_to_element(seat_map).move_by_offset(offset_x, offset_y).click().perform()
+    print(f"Clicked available Konva seat {seat['id']} at ({seat['x']:.0f}, {seat['y']:.0f})")
+    return True
 
 def final_page(driver):
     checkbox = driver.find_element(By.ID, "chkCanAgreeAll")
@@ -392,7 +332,6 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             accept_alert_if_present(driver, timeout=0.05)
 
             seat_window = switch_to_new_window(driver, main_window, timeout=10)
-            # time.sleep(5)
             print("Currently in New Window: ", driver.current_window_handle)
             seat_window_opened_at = time.perf_counter()
             in_booking = True
@@ -423,7 +362,6 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             ticketing_btn.click()
             elapsed = time.perf_counter() - seat_window_opened_at
             print(f"Time from popup opening to nextTicketSelection click: {elapsed:.3f}s")
-            exit(0)
 
             # If someoone has already clicked the seat, dialogue box appears saying
             # 이미 선택된 좌석입니다. [T8280]

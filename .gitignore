@@ -1,2 +1,3 @@
 # Ignore credentials file(s)
 *.json
+__pycache__/
