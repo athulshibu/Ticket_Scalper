@@ -9,8 +9,8 @@ import requests
 from scalper_selenium import beep_beep
 
 if __name__ == "__main__":
-    # print("Testing local beep sound (count=3)...")
-    # beep_beep(count=3)
+    print("Testing local beep sound (count=3)...")
+    beep_beep(count=3)
 
     print("Testing Telegram notification (no count, uses credentials.json)...")
 
