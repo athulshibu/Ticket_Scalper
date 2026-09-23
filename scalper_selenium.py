@@ -1,5 +1,6 @@
 import os
 import time
+from datetime import datetime
 
 import pyautogui
 import winsound
@@ -25,6 +26,23 @@ def switch_to_new_window(driver, old_handle, timeout=10):
             driver.switch_to.window(h)
             return h
     raise RuntimeError("New window not found")
+
+def open_seat_window(driver, main_window, book_button_locator, timeout=10):
+    driver.switch_to.window(main_window)
+    for attempt in range(3):
+        try:
+            WebDriverWait(
+                driver,
+                1,
+                ignored_exceptions=(StaleElementReferenceException,),
+            ).until(EC.element_to_be_clickable(book_button_locator)).click()
+            break
+        except StaleElementReferenceException:
+            if attempt == 2:
+                raise
+
+    accept_alert_if_present(driver, timeout=0.05)
+    return switch_to_new_window(driver, main_window, timeout=timeout)
 
 def switch_into_iframe_containing(driver, by, value, timeout=10):
     """Switches into the iframe that contains (by, value). Leaves you inside it."""
@@ -234,7 +252,8 @@ def pick_first_blue_seat_then_confirm(driver, timeout=30):
     try:
         seat_map, seat = WebDriverWait(driver, timeout).until(find_first_available_seat)
     except TimeoutException:
-        print("No available Konva seat found yet")
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        print(f"[{timestamp}] No available Konva seat found yet")
         return False
     map_width = seat_map.size["width"]
     map_height = seat_map.size["height"]
@@ -284,7 +303,7 @@ def beep_beep(count=None, message="Something happened!"):
         r = requests.get(f"{url}/sendMessage", params=params)
 
 
-def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
+def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, refresh_mode="map"):
     counter = 0
     number_of_movies = len(movies)
     driver.get(link_to_ticketing)
@@ -323,54 +342,45 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             print("All handles:", driver.window_handles)
             print("Current handle:", driver.current_window_handle)
             book_button_locator = (By.XPATH, '//button[normalize-space()="예매"]')
-            for attempt in range(3):
-                try:
-                    WebDriverWait(
-                        driver,
-                        1,
-                        ignored_exceptions=(StaleElementReferenceException,),
-                    ).until(EC.element_to_be_clickable(book_button_locator)).click()
-                    break
-                except StaleElementReferenceException:
-                    if attempt == 2:
-                        raise
-
-            # Possibility of a Popup
-            accept_alert_if_present(driver, timeout=0.05)
-
-            seat_window = switch_to_new_window(driver, main_window, timeout=10)
+            seat_window = open_seat_window(driver, main_window, book_button_locator)
             print("Currently in New Window: ", driver.current_window_handle)
             seat_window_opened_at = time.perf_counter()
             in_booking = True
 
             # Colour of available seat is RGB(129,171,255)
             # Colour of not available seat is RGB(175,175,175)
-            if not pick_first_blue_seat_then_confirm(driver, timeout=1):
-                beep_beep(message=f"Red button, but no seat for {movie[0]} - {movie[1]}")
-                while True:
-                    refresh_seat_map(driver)
-                    if pick_first_blue_seat_then_confirm(driver, timeout=1):
-                        break
-                # while not pick_first_blue_seat_then_confirm(driver):
-                #     print(time.time()-this_start_time)
-                #     driver.switch_to.window(main_window)
-                #     book_btn.click()
-                #     driver.switch_to.window(seat_window)
-                #     this_start_time = time.time()
-                print("Seat found after Refreshing")
+            no_seat_notified = False
+            while True:
+                if not pick_first_blue_seat_then_confirm(driver, timeout=1):
+                    if not no_seat_notified:
+                        beep_beep(message=f"Red button, but no seat for {movie[0]} - {movie[1]}")
+                        no_seat_notified = True
+                    if refresh_mode == "map":
+                        refresh_seat_map(driver)
+                    else:
+                        driver.close()
+                        seat_window = open_seat_window(driver, main_window, book_button_locator)
+                    continue
 
-            # Text on Ticketing button before seat is selected = 좌석선택
-            # Text on Tickeitng button after seat is selected = 다음단계
-            # Text when seat is unselected = 좌석선택
-            print("Waiting for button")
-            # breakpoint()
-            ticketing_btn = find_in_document_or_frames(driver, By.ID, "nextTicketSelection")
-            ticketing_btn.click()
+                # Text on Ticketing button before seat is selected = 좌석선택
+                # Text on Ticketing button after seat is selected = 다음단계
+                print("Waiting for button")
+                ticketing_btn = find_in_document_or_frames(driver, By.ID, "nextTicketSelection")
+                ticketing_btn.click()
+
+                # The selected seat may have been claimed by another customer.
+                if accept_alert_if_present(driver, timeout=1):
+                    print("Seat was already selected; refreshing and trying again")
+                    if refresh_mode == "map":
+                        refresh_seat_map(driver)
+                    else:
+                        driver.close()
+                        seat_window = open_seat_window(driver, main_window, book_button_locator)
+                    continue
+                break
+
             elapsed = time.perf_counter() - seat_window_opened_at
             print(f"Time from popup opening to nextTicketSelection click: {elapsed:.3f}s")
-
-            # If someoone has already clicked the seat, dialogue box appears saying
-            # 이미 선택된 좌석입니다. [T8280]
 
             # dropdown_box = WebDriverWait(driver, 0.5).until(
             #     EC.presence_of_element_located((By.ID, "volume_1_1"))
@@ -412,6 +422,12 @@ def parse_args(argv=None):
 
     parser.add_argument("-m", "--movie_id", type=int, default=-1, help="ID of the movie in the list")
     parser.add_argument("-c", "--credentials", type=str, default="credentials.json", help="Credentials file")
+    parser.add_argument(
+        "--refresh-mode",
+        choices=("map", "reopen"),
+        default="map",
+        help="Refresh the seat map in place or close and reopen the booking window",
+    )
 
 
     args, _ = parser.parse_known_args(argv)
@@ -425,7 +441,7 @@ if __name__ == "__main__":
         # ["056", "Final Interview", "Lotte_6", False],
         # ["129", "Final Interview", "Lotte_4", False],
         # ["605", "Final Interview", "Lotte_4", False],
-        ["804", "Blah", "Lotte_4", False],
+        ["320", "Sapiens", "Lotte_3", False],
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
@@ -445,7 +461,7 @@ if __name__ == "__main__":
     driver = webdriver.Chrome(options=opts)
     # driver = webdriver.Chrome()
     while(True):
-        main(link_to_ticketing, user_id, password, movies, 550)
+        main(link_to_ticketing, user_id, password, movies, 550, args.refresh_mode)
         battery = psutil.sensors_battery()
         if battery is not None:
             percent = battery.percent
