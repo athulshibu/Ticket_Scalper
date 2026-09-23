@@ -446,14 +446,17 @@ if __name__ == "__main__":
 
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
+        # ["021", "Mother Mary", "BCC", False],
         ["042", "Bucking Fastard", "Lotte_2", False],
         ["056", "Final Interview", "Lotte_6", False],
         ["129", "Final Interview", "Lotte_4", False],
-        # ["382", "Ray Gunn", "CGV_IMAX", False],
 
         # ["089", "Possible Love", "CGV_IMAX", False],
-        
-        # ["021", "Mother Mary", "BCC", False],
+        # ["382", "Ray Gunn", "CGV_IMAX", False],
+        # ["290", "About and Intimate Matter", "CGV_1", False],
+        # ["355", "Woman Unknown", "KOFIC", True],
+        ["277", "Diary of a Chambermaid", "BCC_2", False],
+
 
         # ["605", "Final Interview", "Lotte_4", False],
         # ["320", "Sapiens", "Lotte_3", False],
