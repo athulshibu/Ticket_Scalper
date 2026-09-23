@@ -294,15 +294,16 @@ def final_page_fast():
     return
 
 def beep_beep(count=None, message="Something happened!"):
+    if count is not None:
+        for _ in range(count):
+            winsound.Beep(1000,500)
+            time.sleep(0.1)
+
     with open("credentials.json", encoding="utf-8") as f:
         data = json.load(f)
     my_id = data.get("my_id")
     token = data.get("notification_bot_http_api")
-    if (count is not None) or (token is None or token == ""):
-        for _ in range(count):
-            winsound.Beep(1000,500)
-            time.sleep(0.1)
-    else:
+    if token:
         url = f"https://api.telegram.org/bot{token}"
         params = {"chat_id": my_id, "text": message}
         r = requests.get(f"{url}/sendMessage", params=params)
@@ -403,8 +404,8 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
             final_page(driver)
             # final_page_fast()
 
-            beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!")
-            return
+            beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!", count=3)
+            exit(0)
         except BookingUnavailableError:
             print(f"Movie {movie[0]} is unavailable; searching again")
         except Exception as e:
@@ -445,10 +446,18 @@ if __name__ == "__main__":
 
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
+        ["042", "Bucking Fastard", "Lotte_2", False],
         ["056", "Final Interview", "Lotte_6", False],
-        # ["129", "Final Interview", "Lotte_4", False],
+        ["129", "Final Interview", "Lotte_4", False],
+        # ["382", "Ray Gunn", "CGV_IMAX", False],
+
+        # ["089", "Possible Love", "CGV_IMAX", False],
+        
+        # ["021", "Mother Mary", "BCC", False],
+
         # ["605", "Final Interview", "Lotte_4", False],
         # ["320", "Sapiens", "Lotte_3", False],
+        # ["692", "Sinner", "Lotte_4", False]
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
