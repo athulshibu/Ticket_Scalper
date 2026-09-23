@@ -313,16 +313,27 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
     counter = 0
     number_of_movies = len(movies)
     driver.get(link_to_ticketing)
-    tel_box = driver.find_element(By.ID, "telNo") # ID of Username Textbox
-    tel_box.send_keys(user_id)
-    password_box = driver.find_element(By.ID, "password") # ID of Password Textbox
-    password_box.send_keys(password)
 
-    driver.find_element(By.CSS_SELECTOR, 'button[onclick="goReservation_Mypage();"]').click()
-    # This confirmation is raised by the login click, before the reservation page loads.
-    accept_alert_if_present(driver, timeout=1)
+    def login_form_or_reservation_page(driver):
+        if driver.find_elements(By.ID, "bridgeReserveBtn"):
+            return "reservation"
+        if driver.find_elements(By.ID, "telNo"):
+            return "login"
+        return False
+
+    page = WebDriverWait(driver, 15).until(login_form_or_reservation_page)
+    if page == "login":
+        tel_box = driver.find_element(By.ID, "telNo")
+        tel_box.send_keys(user_id)
+        password_box = driver.find_element(By.ID, "password")
+        password_box.send_keys(password)
+
+        driver.find_element(By.CSS_SELECTOR, 'button[onclick="goReservation_Mypage();"]').click()
+        # This confirmation is raised by the login click, before the reservation page loads.
+        accept_alert_if_present(driver, timeout=1)
+
     WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.ID, "bridgeReserveBtn"))  # ID of the textbox to enter in the movie code
+        EC.visibility_of_element_located((By.ID, "bridgeReserveBtn"))
     )
     driver.find_element(By.ID, "bridgeReserveBtn").click()
     WebDriverWait(driver, 10).until(
