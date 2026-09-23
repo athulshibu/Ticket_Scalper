@@ -19,6 +19,9 @@ from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.options import Options
 
+class BookingUnavailableError(Exception):
+    """Raised when a searched movie has no clickable booking button."""
+
 def switch_to_new_window(driver, old_handle, timeout=10):
     WebDriverWait(driver, timeout).until(lambda d: len(d.window_handles) > 1)
     for h in driver.window_handles:
@@ -33,13 +36,15 @@ def open_seat_window(driver, main_window, book_button_locator, timeout=10):
         try:
             WebDriverWait(
                 driver,
-                1,
+                0.02,
                 ignored_exceptions=(StaleElementReferenceException,),
             ).until(EC.element_to_be_clickable(book_button_locator)).click()
             break
         except StaleElementReferenceException:
             if attempt == 2:
                 raise
+        except TimeoutException as error:
+            raise BookingUnavailableError("Booking button is unavailable") from error
 
     accept_alert_if_present(driver, timeout=0.05)
     return switch_to_new_window(driver, main_window, timeout=timeout)
@@ -400,6 +405,8 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
 
             beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!")
             return
+        except BookingUnavailableError:
+            print(f"Movie {movie[0]} is unavailable; searching again")
         except Exception as e:
             print(f"Booking popup failed: {type(e).__name__}: {e}")
             raise
@@ -438,10 +445,10 @@ if __name__ == "__main__":
 
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
-        # ["056", "Final Interview", "Lotte_6", False],
+        ["056", "Final Interview", "Lotte_6", False],
         # ["129", "Final Interview", "Lotte_4", False],
         # ["605", "Final Interview", "Lotte_4", False],
-        ["320", "Sapiens", "Lotte_3", False],
+        # ["320", "Sapiens", "Lotte_3", False],
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
