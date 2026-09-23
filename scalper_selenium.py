@@ -404,7 +404,7 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
             final_page(driver)
             # final_page_fast()
 
-            beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!", count=3)
+            beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!", count=100)
             exit(0)
         except BookingUnavailableError:
             print(f"Movie {movie[0]} is unavailable; searching again")

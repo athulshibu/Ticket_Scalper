@@ -1,7 +1,7 @@
 
 # BIFF 2025 Ticket Scalper
 
-Will hopefully also work in 2026 🤞
+Will hopefully also work in 2027 🤞
 
 ## Initial Setup
 
@@ -19,14 +19,15 @@ Now search for BotFather and send the message `/start`. Help is displayed. Send 
 
 ### Step 5: Create a Python Virtual environment, and enter it
 ```
-python venv -m workspace
+python -m venv workspace
 workspace\Scripts\activate.bat
 ```
 
 ### Step 6: Install required packages
 ```
-pip install pyautogui winsound 
+pip install pyautogui 
 pip install psutil requests selenium Pillow
+pip install winsound
 ```
 
 ### Step 7: Run `json_creator.py`
