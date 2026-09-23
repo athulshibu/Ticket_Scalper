@@ -36,7 +36,7 @@ def open_seat_window(driver, main_window, book_button_locator, timeout=10):
         try:
             WebDriverWait(
                 driver,
-                0.02,
+                0.03,
                 ignored_exceptions=(StaleElementReferenceException,),
             ).until(EC.element_to_be_clickable(book_button_locator)).click()
             break
@@ -458,15 +458,15 @@ if __name__ == "__main__":
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
         # ["021", "Mother Mary", "BCC", False],
-        ["042", "Bucking Fastard", "Lotte_2", False],
-        ["056", "Final Interview", "Lotte_6", False],
-        ["129", "Final Interview", "Lotte_4", False],
+        # ["042", "Bucking Fastard", "Lotte_2", False],
+        # ["056", "Final Interview", "Lotte_6", False],
+        # ["129", "Final Interview", "Lotte_4", False],
 
         # ["089", "Possible Love", "CGV_IMAX", False],
-        # ["382", "Ray Gunn", "CGV_IMAX", False],
+        ["382", "Ray Gunn", "CGV_IMAX", False],
         # ["290", "About and Intimate Matter", "CGV_1", False],
         # ["355", "Woman Unknown", "KOFIC", True],
-        ["277", "Diary of a Chambermaid", "BCC_2", False],
+        # ["277", "Diary of a Chambermaid", "BCC_2", False],
 
 
         # ["605", "Final Interview", "Lotte_4", False],
@@ -496,7 +496,7 @@ if __name__ == "__main__":
         if battery is not None:
             percent = battery.percent
             if percent < 10:
-                beep_beep(100)
+                beep_beep(count=100, message=f"Battery critically low: {percent}%")
             elif percent < 20:
-                beep_beep(20)
+                beep_beep(count=20, message=f"Battery low: {percent}%")
     # exit()

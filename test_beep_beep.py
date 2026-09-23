@@ -3,7 +3,7 @@
 Run with: python test_beep_beep.py
 """
 import json
-
+import psutil
 import requests
 
 from scalper_selenium import beep_beep
@@ -13,6 +13,9 @@ if __name__ == "__main__":
     beep_beep(count=3)
 
     print("Testing Telegram notification (no count, uses credentials.json)...")
+
+    battery = psutil.sensors_battery()
+    percent = battery.percent if battery is not None else -1
 
     # Call the raw Telegram API directly so we can see *why* it fails, since
     # beep_beep() itself doesn't check/print the response.
@@ -31,5 +34,6 @@ if __name__ == "__main__":
     print(f"Response: {r.text}")
 
     beep_beep(message="Test message from test_beep_beep.py")
+    beep_beep(message=f"Battery level: {percent}%", count=1)
 
     print("Done. Check your speakers and Telegram chat.")
