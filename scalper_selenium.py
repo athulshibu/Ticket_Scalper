@@ -72,6 +72,13 @@ def find_in_document_or_frames(driver, by, value):
         raise NoSuchElementException(f"Could not find {value!r} in the popup document or its iframes")
     return element
 
+def refresh_seat_map(driver):
+    refresh_button = find_in_document_or_frames(driver, By.CSS_SELECTOR, ".btn-map .btn-reset")
+    try:
+        refresh_button.click()
+    except (ElementClickInterceptedException, ElementNotInteractableException):
+        driver.execute_script("arguments[0].click();", refresh_button)
+
 def check_checkbox(driver, checkbox_id="chkCanAgreeAll", timeout=0.5):
     # 1) leave any seat iframe; checkbox is usually in the main doc
     driver.switch_to.default_content()
@@ -338,13 +345,12 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
 
             # Colour of available seat is RGB(129,171,255)
             # Colour of not available seat is RGB(175,175,175)
-            if not pick_first_blue_seat_then_confirm(driver):
+            if not pick_first_blue_seat_then_confirm(driver, timeout=1):
                 beep_beep(message=f"Red button, but no seat for {movie[0]} - {movie[1]}")
-                # this_start_time = 0
-                while not pick_first_blue_seat_then_confirm(driver):
-                    # print(time.time()-this_start_time)
-                    driver.execute_script("refreshMap();")
-                    # this_start_time = time.time()
+                while True:
+                    refresh_seat_map(driver)
+                    if pick_first_blue_seat_then_confirm(driver, timeout=1):
+                        break
                 # while not pick_first_blue_seat_then_confirm(driver):
                 #     print(time.time()-this_start_time)
                 #     driver.switch_to.window(main_window)
@@ -418,7 +424,8 @@ if __name__ == "__main__":
         # [Movie code, Movie name, Theatre code, 19+ or not]
         # ["056", "Final Interview", "Lotte_6", False],
         # ["129", "Final Interview", "Lotte_4", False],
-        ["605", "Final Interview", "Lotte_4", False],
+        # ["605", "Final Interview", "Lotte_4", False],
+        ["804", "Blah", "Lotte_4", False],
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
