@@ -9,7 +9,7 @@ import json
 import psutil
 import argparse
 import requests
-from PIL import Image
+from PIL import Image, ImageChops
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -240,45 +240,52 @@ def pick_first_blue_seat_then_confirm(driver, timeout=30):
         seat_map.get_attribute("id") or seat_map.get_attribute("class") or "unnamed",
     )
     screenshot = Image.open(io.BytesIO(seat_map.screenshot_as_png)).convert("RGB")
-    pixels = screenshot.load()
     width, height = screenshot.size
-    visited = set()
+    red, green, blue = screenshot.split()
+    mask = ImageChops.multiply(
+        ImageChops.multiply(
+            red.point([255 if 121 <= value <= 137 else 0 for value in range(256)]),
+            green.point([255 if 163 <= value <= 179 else 0 for value in range(256)]),
+        ),
+        blue.point([255 if 247 <= value <= 255 else 0 for value in range(256)]),
+    )
+    bounds = mask.getbbox()
+    if bounds:
+        _, top, _, _ = bounds
+        row_bounds = mask.crop((0, top, width, top + 1)).getbbox()
+        if not row_bounds:
+            print("No available blue seats found in #seatMap")
+            return False
+        left, _, _, _ = row_bounds
+        search_width = min(50, width - left)
+        search_height = min(50, height - top)
+        seat_mask = mask.crop((left, top, left + search_width, top + search_height))
+        seat_pixels = seat_mask.load()
+        region = []
+        queue = deque([(0, 0)])
+        visited = {(0, 0)}
 
-    def is_available_blue(pixel):
-        red, green, blue = pixel
-        return 121 <= red <= 137 and 163 <= green <= 179 and 247 <= blue <= 255
-
-    for y in range(height):
-        for x in range(width):
-            if (x, y) in visited or not is_available_blue(pixels[x, y]):
-                continue
-
-            region = []
-            queue = deque([(x, y)])
-            visited.add((x, y))
-            while queue:
-                current_x, current_y = queue.popleft()
-                region.append((current_x, current_y))
-                for next_x, next_y in (
-                    (current_x - 1, current_y),
-                    (current_x + 1, current_y),
-                    (current_x, current_y - 1),
-                    (current_x, current_y + 1),
+        while queue:
+            current_x, current_y = queue.popleft()
+            region.append((current_x, current_y))
+            for next_x, next_y in (
+                (current_x - 1, current_y),
+                (current_x + 1, current_y),
+                (current_x, current_y - 1),
+                (current_x, current_y + 1),
+            ):
+                if (
+                    0 <= next_x < search_width
+                    and 0 <= next_y < search_height
+                    and (next_x, next_y) not in visited
+                    and seat_pixels[next_x, next_y]
                 ):
-                    if (
-                        0 <= next_x < width
-                        and 0 <= next_y < height
-                        and (next_x, next_y) not in visited
-                        and is_available_blue(pixels[next_x, next_y])
-                    ):
-                        visited.add((next_x, next_y))
-                        queue.append((next_x, next_y))
+                    visited.add((next_x, next_y))
+                    queue.append((next_x, next_y))
 
-            if len(region) < 25:
-                continue
-
-            pixel_x = sum(point[0] for point in region) / len(region)
-            pixel_y = sum(point[1] for point in region) / len(region)
+        if len(region) >= 25:
+            pixel_x = left + sum(point[0] for point in region) / len(region)
+            pixel_y = top + sum(point[1] for point in region) / len(region)
             map_width = seat_map.size["width"]
             map_height = seat_map.size["height"]
             offset_x = pixel_x * map_width / width - map_width / 2
@@ -340,12 +347,12 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
     password_box.send_keys(password)
 
     driver.find_element(By.CSS_SELECTOR, 'button[onclick="goReservation_Mypage();"]').click()
+    # This confirmation is raised by the login click, before the reservation page loads.
+    accept_alert_if_present(driver, timeout=1)
     WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((By.ID, "bridgeReserveBtn"))  # ID of the textbox to enter in the movie code
     )
     driver.find_element(By.ID, "bridgeReserveBtn").click()
-    # The site may ask to terminate an existing login session before continuing.
-    accept_alert_if_present(driver, timeout=1)
     WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((By.ID, "sdCode"))  # ID of the textbox to enter in the movie code
     )
@@ -387,6 +394,7 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             seat_window = switch_to_new_window(driver, main_window, timeout=10)
             # time.sleep(5)
             print("Currently in New Window: ", driver.current_window_handle)
+            seat_window_opened_at = time.perf_counter()
             in_booking = True
 
             # Colour of available seat is RGB(129,171,255)
@@ -413,6 +421,9 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # breakpoint()
             ticketing_btn = find_in_document_or_frames(driver, By.ID, "nextTicketSelection")
             ticketing_btn.click()
+            elapsed = time.perf_counter() - seat_window_opened_at
+            print(f"Time from popup opening to nextTicketSelection click: {elapsed:.3f}s")
+            exit(0)
 
             # If someoone has already clicked the seat, dialogue box appears saying
             # 이미 선택된 좌석입니다. [T8280]
@@ -420,10 +431,15 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # dropdown_box = WebDriverWait(driver, 0.5).until(
             #     EC.presence_of_element_located((By.ID, "volume_1_1"))
             # )
-            dropdown = driver.find_element(By.ID, "volume_1_1")
+            dropdown = WebDriverWait(driver, 3).until(
+                lambda _: find_in_document_or_frames(driver, By.ID, "volume_1_1")
+            )
             Select(dropdown).select_by_value("1")
             # Text on button = 가격선택
-            driver.find_element(By.ID, "nextPayment").click()
+            payment_button = WebDriverWait(driver, 3).until(
+                lambda _: find_in_document_or_frames(driver, By.ID, "nextPayment")
+            )
+            payment_button.click()
 
             final_page(driver)
             # final_page_fast()
