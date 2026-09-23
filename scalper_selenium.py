@@ -1,5 +1,7 @@
+import io
 import os
 import time
+from collections import deque
 
 import pyautogui
 import winsound
@@ -7,13 +9,14 @@ import json
 import psutil
 import argparse
 import requests
+from PIL import Image
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, NoSuchElementException, ElementNotInteractableException, ElementClickInterceptedException, StaleElementReferenceException
 from selenium.webdriver.support.ui import Select
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.chrome.options import Options
@@ -48,6 +51,29 @@ def switch_into_iframe_containing(driver, by, value, timeout=10):
 
     driver.switch_to.default_content()
     raise NoSuchElementException("Element not found in any iframe")
+
+def find_in_document_or_frames(driver, by, value):
+    """Find an element in the current window, preserving its document context."""
+    driver.switch_to.default_content()
+
+    def search_frames():
+        matches = driver.find_elements(by, value)
+        if matches:
+            return matches[0]
+
+        for frame in driver.find_elements(By.TAG_NAME, "iframe"):
+            driver.switch_to.frame(frame)
+            match = search_frames()
+            if match:
+                return match
+            driver.switch_to.parent_frame()
+        return None
+
+    element = search_frames()
+    if element is None:
+        driver.switch_to.default_content()
+        raise NoSuchElementException(f"Could not find {value!r} in the popup document or its iframes")
+    return element
 
 def check_checkbox(driver, checkbox_id="chkCanAgreeAll", timeout=0.5):
     # 1) leave any seat iframe; checkbox is usually in the main doc
@@ -170,75 +196,99 @@ def accept_alert_if_present(driver, timeout=0.1):
 def pick_first_blue_seat_then_confirm(driver, timeout=30):
     """
     Assumes you've already switched to the seat popup window.
-    This function will switch into the iframe that contains the seat map,
-    click the first available (blue) seat, then click the '좌석선택' button.
-    Returns True if it clicked a seat and the button, else False.
+    Finds the first available blue seat rendered in the canvas seat map and
+    clicks it. Returns True when a blue seat is found, else False.
     """
-
-    # --- 1) Go into the iframe that contains the seat layer ---
-    # (re-use your helper if you like; this is inline to be explicit)
-    def switch_into_iframe_with(selector_css, timeout=15):
-        driver.switch_to.default_content()
-        try:
-            # Top-level first
-            WebDriverWait(driver, 1).until(EC.presence_of_element_located((By.CSS_SELECTOR, selector_css)))
-            return
-        except:
-            pass
-        # Search all iframes
-        frames = driver.find_elements(By.TAG_NAME, "iframe")
-        for fr in frames:
-            driver.switch_to.default_content()
-            driver.switch_to.frame(fr)
-            try:
-                WebDriverWait(driver, 2).until(EC.presence_of_element_located((By.CSS_SELECTOR, selector_css)))
-                return
-            except:
-                continue
-        driver.switch_to.default_content()
-        raise RuntimeError(f"Could not find {selector_css} in any iframe")
-
-    # Make sure we are looking inside the SVG seat layer
-    switch_into_iframe_with("g#ezSeatLayer", timeout=timeout)
-
-    # --- 2) Wait for the seat layer and collect available seats ---
-    seat_layer = WebDriverWait(driver, timeout).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "g#ezSeatLayer"))
-    )
-
-    # Primary selector: attribute-based (most reliable)
-    seats = seat_layer.find_elements(
-        By.CSS_SELECTOR, 'g[id^="seatgroup_"] rect[gtype="SEAT"][use_yn="Y"][seat_status_cd="SS01000"]'
-    )
-
-    # Fallback: detect by blue fill (if attributes are late to appear)
-    if not seats:
-        seats = seat_layer.find_elements(
-            By.XPATH, './/g[starts-with(@id,"seatgroup_")]//rect[contains(@style,"rgb(129, 171, 255)")]'
+    def largest_canvas_container():
+        canvases = []
+        for canvas in driver.find_elements(By.TAG_NAME, "canvas"):
+            size = canvas.size
+            if canvas.is_displayed() and size["width"] >= 200 and size["height"] >= 200:
+                canvases.append(canvas)
+        if not canvases:
+            return False
+        largest_canvas = max(
+            canvases,
+            key=lambda canvas: canvas.size["width"] * canvas.size["height"],
         )
+        return largest_canvas.find_element(By.XPATH, "..")
 
-    if not seats:
-        print("❌ No available (blue) seats found under #ezSeatLayer")
+    def find_canvas_container(_):
+        driver.switch_to.default_content()
+        seat_map = largest_canvas_container()
+        if seat_map:
+            return seat_map
+
+        frames = driver.find_elements(By.TAG_NAME, "iframe")
+        for frame in frames:
+            driver.switch_to.default_content()
+            driver.switch_to.frame(frame)
+            seat_map = largest_canvas_container()
+            if seat_map:
+                return seat_map
+
+        driver.switch_to.default_content()
         return False
 
-    first = seats[0]
+    try:
+        seat_map = WebDriverWait(driver, timeout).until(find_canvas_container)
+    except TimeoutException:
+        print("No visible seat-map canvas found yet")
+        return False
+    print(
+        "Using canvas container:",
+        seat_map.get_attribute("id") or seat_map.get_attribute("class") or "unnamed",
+    )
+    screenshot = Image.open(io.BytesIO(seat_map.screenshot_as_png)).convert("RGB")
+    pixels = screenshot.load()
+    width, height = screenshot.size
+    visited = set()
 
-    # --- 3) Click the seat (JS click is safest for SVG) ---
-    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", first)
-    driver.execute_script("arguments[0].dispatchEvent(new MouseEvent('click', {bubbles:true}))", first)
-    # Alternative: driver.execute_script("arguments[0].click();", first)
+    def is_available_blue(pixel):
+        red, green, blue = pixel
+        return 121 <= red <= 137 and 163 <= green <= 179 and 247 <= blue <= 255
 
-    print("✅ Clicked seat:", first.get_attribute("id"))
+    for y in range(height):
+        for x in range(width):
+            if (x, y) in visited or not is_available_blue(pixels[x, y]):
+                continue
 
-    # # --- 4) Click the red '좌석선택' button ---
-    # # It may become enabled only after a seat is picked; wait for clickability.
-    # btn = WebDriverWait(driver, timeout).until(
-    #     EC.element_to_be_clickable((By.XPATH, '//button[contains(text(),"좌석선택")]'))
-    # )
-    # btn.click()
-    # print("✅ Clicked '좌석선택'")
+            region = []
+            queue = deque([(x, y)])
+            visited.add((x, y))
+            while queue:
+                current_x, current_y = queue.popleft()
+                region.append((current_x, current_y))
+                for next_x, next_y in (
+                    (current_x - 1, current_y),
+                    (current_x + 1, current_y),
+                    (current_x, current_y - 1),
+                    (current_x, current_y + 1),
+                ):
+                    if (
+                        0 <= next_x < width
+                        and 0 <= next_y < height
+                        and (next_x, next_y) not in visited
+                        and is_available_blue(pixels[next_x, next_y])
+                    ):
+                        visited.add((next_x, next_y))
+                        queue.append((next_x, next_y))
 
-    return True
+            if len(region) < 25:
+                continue
+
+            pixel_x = sum(point[0] for point in region) / len(region)
+            pixel_y = sum(point[1] for point in region) / len(region)
+            map_width = seat_map.size["width"]
+            map_height = seat_map.size["height"]
+            offset_x = pixel_x * map_width / width - map_width / 2
+            offset_y = pixel_y * map_height / height - map_height / 2
+            ActionChains(driver).move_to_element(seat_map).move_by_offset(offset_x, offset_y).click().perform()
+            print(f"Clicked first blue seat at ({pixel_x:.0f}, {pixel_y:.0f})")
+            return True
+
+    print("No available blue seats found in #seatMap")
+    return False
 
 def final_page(driver):
     checkbox = driver.find_element(By.ID, "chkCanAgreeAll")
@@ -291,9 +341,15 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
 
     driver.find_element(By.CSS_SELECTOR, 'button[onclick="goReservation_Mypage();"]').click()
     WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.ID, "bridgeReserveBtn"))  # ID of the textbox to enter in the movie code
+    )
+    driver.find_element(By.ID, "bridgeReserveBtn").click()
+    # The site may ask to terminate an existing login session before continuing.
+    accept_alert_if_present(driver, timeout=1)
+    WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((By.ID, "sdCode"))  # ID of the textbox to enter in the movie code
     )
-
+    
     start_time = time.time()
     code_box = driver.find_element(By.ID, "sdCode")
     in_booking = False
@@ -312,10 +368,18 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
         try:
             print("All handles:", driver.window_handles)
             print("Current handle:", driver.current_window_handle)
-            book_btn = WebDriverWait(driver, 0.02).until(
-                EC.presence_of_element_located((By.XPATH, '//button[text()="예매"]'))
-            )
-            book_btn.click()
+            book_button_locator = (By.XPATH, '//button[normalize-space()="예매"]')
+            for attempt in range(3):
+                try:
+                    WebDriverWait(
+                        driver,
+                        1,
+                        ignored_exceptions=(StaleElementReferenceException,),
+                    ).until(EC.element_to_be_clickable(book_button_locator)).click()
+                    break
+                except StaleElementReferenceException:
+                    if attempt == 2:
+                        raise
 
             # Possibility of a Popup
             accept_alert_if_present(driver, timeout=0.05)
@@ -341,14 +405,13 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
                 #     driver.switch_to.window(seat_window)
                 #     this_start_time = time.time()
                 print("Seat found after Refreshing")
-            
+
             # Text on Ticketing button before seat is selected = 좌석선택
             # Text on Tickeitng button after seat is selected = 다음단계
             # Text when seat is unselected = 좌석선택
             print("Waiting for button")
-            ticketing_btn = WebDriverWait(driver, 0.5).until(
-                EC.presence_of_element_located((By.ID, "nextTicketSelection"))
-            )
+            # breakpoint()
+            ticketing_btn = find_in_document_or_frames(driver, By.ID, "nextTicketSelection")
             ticketing_btn.click()
 
             # If someoone has already clicked the seat, dialogue box appears saying
@@ -366,21 +429,20 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550):
             # final_page_fast()
 
             beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!")
-
-            break
             return
         except Exception as e:
-            # driver.execute_script("refreshMap();")
-            # in_booking = False
-            print(e)
-            pass
+            print(f"Booking popup failed: {type(e).__name__}: {e}")
+            raise
 
         counter += 1
         print()
         driver.switch_to.window(main_window)
         code_box.clear()
 
-    driver.find_element(By.CSS_SELECTOR, 'a[href="/biff-logout"]').click()
+    driver.switch_to.window(main_window)
+    logout_links = driver.find_elements(By.CSS_SELECTOR, 'a[href="/biff-logout"]')
+    if logout_links:
+        logout_links[0].click()
     # driver.quit()
     time.sleep(1)
 
@@ -400,27 +462,12 @@ if __name__ == "__main__":
 
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
-        ["020", "No Other Choice", "CGV_IMAX", False],
-        ["083", "No Other Choice", "BCC_1", False],
-        # ["083", "No Other Choice", "BCC_1", False],
-        # ["020", "No Other Choice", "CGV_IMAX", False],
-        ["259", "Kokuho", "CGV_IMAX", False],
-        ["219", "The Furious", "Lotte_6", True],
-
-        # ["179", "Frankenstein", "CGV_IMAX", True],
-        # ["119", "Her Will be Done", "CGV_6", True]
-        # ["023", "Frankenstein", "CGV_IMAX", True],
-        # ["212", "If on a Winter′s Night", "Lotte_5", False],
-
-        ["586", "Tiger", "Lotte_5", True], # Actually CGV_6
-        # ["528", "Adam's Sake", "Lotte_5", False],
-        # ["560", "Eagles of the Republic", "BCC_1", False], 
-        # ["494", "Romeria", "CGV_IMAX", False],
-        # ["930", "Sora", "CGV_IMAX", False], # Actually Megabox 3 
-
+        # ["056", "Final Interview", "Lotte_6", False],
+        # ["129", "Final Interview", "Lotte_4", False],
+        ["605", "Final Interview", "Lotte_4", False],
     ]
 
-    link_to_ticketing = "https://biff.maketicket.co.kr/ko/mypageLogin"
+    link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
     number_of_movies = len(movies)
     args = parse_args()
 

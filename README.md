@@ -26,7 +26,7 @@ workspace\Scripts\activate.bat
 ### Step 6: Install required packages
 ```
 pip install pyautogui winsound 
-pip install psutil requests selenium
+pip install psutil requests selenium Pillow
 ```
 
 ### Step 7: Run `json_creator.py`
