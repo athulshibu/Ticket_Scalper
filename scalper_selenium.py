@@ -346,8 +346,8 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
     while time.time() - start_time < seconds_per_session and not in_booking: # Time in seconds
         movie = movies[counter % number_of_movies]
 
-        print("Current handle:", driver.current_window_handle)
-        print(movie)
+        # print("Current handle:", driver.current_window_handle)
+        # print(movie)
         code_box.send_keys(movie[0])
         # driver.find_element(By.CLASS_NAME, "search-btn fas fa-search")
         driver.execute_script("sdCodeProdList();") # Essentially the same as clicking the search button
@@ -356,11 +356,11 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
         # Button available = 예매
         main_window = driver.current_window_handle
         try:
-            print("All handles:", driver.window_handles)
-            print("Current handle:", driver.current_window_handle)
+            # print("All handles:", driver.window_handles)
+            # print("Current handle:", driver.current_window_handle)
             book_button_locator = (By.XPATH, '//button[normalize-space()="예매"]')
             seat_window = open_seat_window(driver, main_window, book_button_locator)
-            print("Currently in New Window: ", driver.current_window_handle)
+            # print("Currently in New Window: ", driver.current_window_handle)
             seat_window_opened_at = time.perf_counter()
             in_booking = True
 
@@ -418,13 +418,14 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
             beep_beep(message=f"Something happened with {movie[0]} - {movie[1]}!", count=100)
             exit(0)
         except BookingUnavailableError:
-            print(f"Movie {movie[0]} is unavailable; searching again")
+            # print(f"Movie {movie[0]} is unavailable; searching again")
+            pass
         except Exception as e:
             print(f"Booking popup failed: {type(e).__name__}: {e}")
             raise
 
         counter += 1
-        print()
+        # print()
         driver.switch_to.window(main_window)
         code_box.clear()
 
@@ -457,21 +458,12 @@ if __name__ == "__main__":
 
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
-        # ["021", "Mother Mary", "BCC", False],
-        # ["042", "Bucking Fastard", "Lotte_2", False],
-        # ["056", "Final Interview", "Lotte_6", False],
-        # ["129", "Final Interview", "Lotte_4", False],
-
-        # ["089", "Possible Love", "CGV_IMAX", False],
-        ["382", "Ray Gunn", "CGV_IMAX", False],
-        # ["290", "About and Intimate Matter", "CGV_1", False],
-        # ["355", "Woman Unknown", "KOFIC", True],
-        # ["277", "Diary of a Chambermaid", "BCC_2", False],
-
-
-        # ["605", "Final Interview", "Lotte_4", False],
-        # ["320", "Sapiens", "Lotte_3", False],
-        # ["692", "Sinner", "Lotte_4", False]
+        ["089", "Possible Love", "CGV_IMAX", False],
+        # ["139", "Sorry Generation", "Lotte_6", False],
+        # ["072", "Shaving", "BCC", False],
+        ["359", "Belladona of Sadness", "Sohyang", False],
+        # ["087", "Not a Hero", "BCC", False],
+        ["277", "Diary of a Chambermaid", "BCC_2", False],
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
@@ -491,7 +483,7 @@ if __name__ == "__main__":
     driver = webdriver.Chrome(options=opts)
     # driver = webdriver.Chrome()
     while(True):
-        main(link_to_ticketing, user_id, password, movies, 550, args.refresh_mode)
+        main(link_to_ticketing, user_id, password, movies, 400, args.refresh_mode)
         battery = psutil.sensors_battery()
         if battery is not None:
             percent = battery.percent
