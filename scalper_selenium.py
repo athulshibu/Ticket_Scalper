@@ -319,6 +319,8 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
             return "reservation"
         if driver.find_elements(By.ID, "telNo"):
             return "login"
+        if driver.find_elements(By.ID, "sdCode"):
+            return "sdCode"
         return False
 
     page = WebDriverWait(driver, 15).until(login_form_or_reservation_page)
