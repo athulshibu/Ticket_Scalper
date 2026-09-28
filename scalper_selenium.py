@@ -293,7 +293,7 @@ def final_page_fast():
 
     return
 
-def beep_beep(count=None, message="Something happened!"):
+def beep_beep(count=None, message="Something happened in Athul's Laptop!"):
     if count is not None:
         for _ in range(count):
             winsound.Beep(1000,500)
@@ -309,7 +309,7 @@ def beep_beep(count=None, message="Something happened!"):
         r = requests.get(f"{url}/sendMessage", params=params)
 
 
-def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, refresh_mode="map"):
+def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, refresh_mode="map", mode="2026"):
     counter = 0
     number_of_movies = len(movies)
     driver.get(link_to_ticketing)
@@ -332,14 +332,22 @@ def main(link_to_ticketing, user_id, password, movies, seconds_per_session=550, 
         # This confirmation is raised by the login click, before the reservation page loads.
         accept_alert_if_present(driver, timeout=1)
 
-    WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.ID, "bridgeReserveBtn"))
-    )
-    driver.find_element(By.ID, "bridgeReserveBtn").click()
-    WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((By.ID, "sdCode"))  # ID of the textbox to enter in the movie code
-    )
-    
+    # breakpoint()
+    if mode == "2026":
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, "bridgeReserveBtn"))
+        )
+        driver.find_element(By.ID, "bridgeReserveBtn").click()
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, "sdCode"))  # ID of the textbox to enter in the movie code
+        )
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, "sdCode"))
+        )
+    elif mode == "2025":
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, "sdCode"))
+        )
     start_time = time.time()
     code_box = driver.find_element(By.ID, "sdCode")
     in_booking = False
@@ -448,6 +456,12 @@ def parse_args(argv=None):
         default="map",
         help="Refresh the seat map in place or close and reopen the booking window",
     )
+    parser.add_argument(
+        "--login-mode",
+        choices=("2026", "2025"),
+        default="2026",
+        help="Whether or not there will be a enter page after logging in",
+    )
 
 
     args, _ = parser.parse_known_args(argv)
@@ -458,12 +472,12 @@ if __name__ == "__main__":
 
     movies = [
         # [Movie code, Movie name, Theatre code, 19+ or not]
-        ["089", "Possible Love", "CGV_IMAX", False],
-        # ["139", "Sorry Generation", "Lotte_6", False],
         # ["072", "Shaving", "BCC", False],
-        ["359", "Belladona of Sadness", "Sohyang", False],
-        # ["087", "Not a Hero", "BCC", False],
-        ["277", "Diary of a Chambermaid", "BCC_2", False],
+        # ["080", "Union Town", "BCC_2", False],
+        ["087", "Not a Hero", "BCC", False],
+        ["089", "Possible Love", "CGV_IMAX", False],
+        # ["103", "Dhara", "CGV_3", False],
+        ["107", "Soul Whisperer", "CGV_4", False],
     ]
 
     link_to_ticketing = "https://biff.maketicket.co.kr/BIFF/ko/mypageLogin"
@@ -483,7 +497,7 @@ if __name__ == "__main__":
     driver = webdriver.Chrome(options=opts)
     # driver = webdriver.Chrome()
     while(True):
-        main(link_to_ticketing, user_id, password, movies, 400, args.refresh_mode)
+        main(link_to_ticketing, user_id, password, movies, 400, args.refresh_mode, args.login_mode)
         battery = psutil.sensors_battery()
         if battery is not None:
             percent = battery.percent
